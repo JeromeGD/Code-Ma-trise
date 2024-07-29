@@ -1,0 +1,127 @@
+################################################
+# Traitement des donnees et figures initiales  #
+# Auteur: Jerome Gingras Debien                #
+# Date: 2 juillet 2024                         #
+################################################
+
+### Librairies ###
+library(glmmTMB)
+library(sjPlot)
+library(RColorBrewer)
+
+# 1. Telechargement des donnees nettes et organisation ------------------------
+rm (list = ls())
+donnees <- read.table ("Donnees_Corg_nettes.csv",
+                       header = TRUE, 
+                       sep = ",",
+                       dec = ".",
+                       stringsAsFactors = TRUE)
+head(donnees)
+str(donnees)
+summary(donnees)
+names(donnees)
+
+# Reorganisation des levels
+# Jachere en reference pour les cultures
+donnees$Culture <- relevel(donnees$Culture, ref = "Jachere") 
+
+# Ordre pour Receppe: Non;Oui;Jachere
+donnees$Recep <- relevel(donnees$Recep, ref = "Oui")
+donnees$Recep <- relevel(donnees$Recep, ref = "Non")
+
+donnees$Etat <- with(donnees, ifelse (Culture == "Jachere", "Jachere", "Saules")) 
+donnees$Etat <- as.factor(donnees$Etat)
+# 2. Visualisation des donnees ------------------------------------------------
+hist(donnees$P.Corg)
+
+with (donnees, plot(P.Corg ~ Culture))
+with (donnees, plot(P.Corg ~ Etat))
+with (donnees, plot(P.Corg ~ Age))
+with (donnees, plot (P.Corg ~ Horizon))
+with (donnees, plot (P.Corg ~ Recep))
+
+# 3. Analyses selon modeles utilises precedemment -----------------------------
+mod.Corg.beta <- glmmTMB(P.Corg ~ Culture + Horizon + poly(Age, degree =2) + Recep + Culture:Horizon + (1|Site/Section/Carrote), 
+                        data = donnees,
+                        family = "beta_family")
+summary(mod.Corg.beta)
+tab_model (mod.Corg.beta)
+
+#Horizon 2
+mod.Corg.H2.beta <- glmmTMB(P.Corg ~ Culture + Age + Recep + (1|Site/Section/Carrote), 
+                         data = donnees[donnees$Horizon =="H2",],
+                         family = "beta_family")
+summary(mod.Corg.H2.beta)
+tab_model (mod.Corg.H2.beta)
+
+#Modele planté/non-planté pour matière organique
+mod.Corg.Etat.beta <- glmmTMB(P.Corg ~ Etat + Horizon + poly(Age, degree =2) + Recep + Etat:Horizon + (1|Site/Section/Carrote), 
+                         data = donnees,
+                         family = "beta_family")
+summary(mod.Corg.plant.beta)
+tab_model (mod.Corg.plant.beta)
+
+#Modele planté/non-planté pour Pourcentages carbone
+mod.PC.Etat.beta <- glmmTMB(P.C ~ Etat + Horizon + poly(Age, degree =2) + Recep + Etat:Horizon + (1|Site/Section/Carrote), 
+                        data = donnees,
+                        family = "beta_family")
+summary(mod.PC.Etat.beta)
+tab_model (mod.PC.Etat.beta)
+
+#Modele planté/non-planté pour stocks carbone
+mod.stocks.Etat.gamma <- glmmTMB(Stocks ~ Etat + Horizon + poly(Age, degree =2) + Recep + Etat:Horizon + (1|Site/Section/Carrote), 
+                         data = donnees, 
+                         family = Gamma(link = "log"))
+
+summary(mod.stocks.Etat.gamma)
+tab_model (mod.stocks.Etat.gamma)
+
+#Tests pour chaque site - Stocks
+mod.stocks.Site.gamma <- glmmTMB(Stocks ~ Culture + Horizon + Recep + Culture:Horizon + (1|Section/Carrote), 
+                                 data = donnees[donnees$Site == "Mtl1",], 
+                                 family = Gamma(link = "log"))
+
+summary(mod.stocks.Site.gamma)
+tab_model (mod.stocks.Site.gamma)
+
+
+# 4. Figures de base (A REVOIR) -----------------------------------------------
+# Selection des couleurs
+palette <- hcl.colors(5, palette = "Dark2")
+pig <- c("Jachere" = palette[1],
+         "Discolor" = palette[2],
+         "Fish Creek" = palette[3],
+         "SX 64" = palette[4],
+         "SX 67" = palette[5])
+
+pig.trans <- adjustcolor(palette, alpha.f = 0.6)
+
+pig.r <- c("Non" = pig.trans[1],
+           "Oui" = pig.trans[4])
+pig.h <- c("H1" = pig.trans[1],
+           "H2" = pig.trans[4])
+
+pig.trans <- c("Jachere" = pig.trans[1],
+               "Discolor" = pig.trans[2],
+               "Fish Creek" = pig.trans[3],
+               "SX 64" = pig.trans[4],
+               "SX 67" = pig.trans[5])
+#Graph selon le cultivar
+with(donnees,
+     plot(P.Corg ~ jitter(as.numeric(Culture), 0.4),
+          xlim = c(0, 6), ylim = c(0, 0.20), axes = F,
+          pch = 16, col = pig.trans[as.character(donnees$Culture)],
+          xlab = "Culture",
+          ylab = "Matière organique (%)",
+          cex = 1.5,
+          cex.lab = 1.5))
+axis(side = 1, at = 1:5, 
+     labels = c("Jachere", "Discolor", "Fish Creek", "SX 64", "SX 67"),
+     cex.axis = 1)
+axis(side = 2, at = seq(0, 0.20, 0.05), cex.axis = 1.25, las = 1)
+box()
+
+#Boxplot selon l'horizon
+with (donnees, plot (P.Corg ~ Horizon,
+      ylab = "Matière organique (%)",
+      col = pig.h))
