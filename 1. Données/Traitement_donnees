@@ -1,0 +1,111 @@
+###########################
+# Traitement des donnees  #
+# Auteur: Simon et Jerome #
+# Date: 15 avril 2024    #
+###########################
+
+
+# 1. Telechargement des donnees brutes -------------------------------------
+rm(list = ls())
+donnees <- read.table("1. Donnees/Donnees_C_brutes.csv",
+                           header = TRUE,
+                           sep = ",",
+                           dec = ".",
+                           stringsAsFactors = TRUE)
+head(donnees)
+str(donnees)
+summary(donnees)
+names(donnees)
+
+
+# 2. Ajout de la variable aléatoire Carrote -------------------------------
+
+
+seq1 <- seq(1, (nrow(donnees)/2), by = 1)
+seq2 <- seq1
+Carrote <- as.integer(c(seq1, seq2))
+Carrote <- sort(Carrote)
+Carrote
+donnees$Carrote <- Carrote
+head(donnees)
+
+# 3. Retrait des informations supplémentaires -----------------------------
+
+# Retrait des échantillons manquants
+levels(donnees$Notes)
+donnees[donnees$Notes == "MANQUANT",] # Identification du site manquant
+
+donnees <- donnees[!(donnees$Notes %in% "MANQUANT"),]
+donnees[donnees$Notes == "MANQUANT",]
+
+# Retrait des colonnes supplémentaires
+donnees$Notes <- NULL # colonne excedentaire
+donnees$Nom_original <- NULL # colonne excedentaire
+
+# Ajustement des noms de colonne
+names(donnees) <- c("Site","Section","ID","Culture",
+                      "Age","Recep","Horizon","P.N", "P.C","MVA", "Carrote")
+head(donnees)
+
+# 4. Reorganisation des colonnes ------------------------------------------
+donnees <- with(donnees,
+                data.frame(ID, P.C, P.N, MVA, Carrote, Horizon, Recep, 
+                           Culture, Age, Site, Section))
+                
+head(donnees)
+str(donnees)
+
+# 5. Correction des Levels ------------------------------------------------
+# Correction des sites
+donnees$Site <- as.character(donnees$Site)
+donnees$Site[donnees$Site == "Monsabré"] <- "Monsabre"
+donnees$Site[donnees$Site == "Mtl Est 1"] <- "Mtl1"
+donnees$Site[donnees$Site == "Mtl Est 2"] <- "Mtl2"
+donnees$Site[donnees$Site == "Mtl Est 3"] <- "Mtl3"
+donnees$Site[donnees$Site == "Mtl Est 4"] <- "Mtl4"
+donnees$Site <- as.factor(donnees$Site)
+
+# Correction de Recep
+donnees$Recep <- as.character(donnees$Recep)
+donnees$Recep[donnees$Recep == "Témoin"] <- "Jachere"
+donnees$Recep <- as.factor(donnees$Recep)
+
+# Correction culture
+donnees$Culture <- as.character(donnees$Culture)
+donnees$Culture[donnees$Culture == "Témoin "] <- "Jachere"
+donnees$Culture[donnees$Culture == "SX 67"] <- "SX67"
+donnees$Culture[donnees$Culture == "SX 64"] <- "SX64"
+donnees$Culture[donnees$Culture == "Fish Creek"] <- "Fish_Creek"
+donnees$Culture <- as.factor(donnees$Culture)
+
+head(donnees)
+str(donnees)
+
+# 6. Calcul des stocks de carbone en T/ha ---------------------------------
+donnees$Stocks <- NA
+donnees$Profondeur <- NA
+#Formule pour les stocks: [C] * MVA * Profondeur * 0.1 (facteur de conversion)
+donnees$Profondeur[donnees$Horizon == "H1"] <- 30 
+donnees$Profondeur[donnees$Horizon == "H2"] <- 30
+
+donnees$Stocks <- (donnees$P.C * donnees$MVA * donnees$Profondeur * 0.1)
+
+# 7. Transformation des pourcentages de N et C --------------------------------
+# Les valeurs de pourcentages d'azote et de carbone doivent etre entre 0 et 1.
+summary(donnees$P.C) # Valeur max<1 (max=24,33%); valeur entre 0 et 100
+summary(donnees$P.N) # Valeur max<1 (max=10,02%); valeur entre 0 et 100
+
+donnees$P.C <- donnees$P.C / 100
+donnees$P.N <- donnees$P.N / 100
+
+summary(donnees$P.C) # Valeur entre 0 et 1
+summary(donnees$P.N) # Valeur entre 0 et 1
+
+# 8. Sauvegarde des donnees nettes -----------------------------------------
+
+write.csv(donnees, file = "Donnees_C_nettes.csv", row.names = F)
+
+rm(list = ls())
+
+
+# Fin
